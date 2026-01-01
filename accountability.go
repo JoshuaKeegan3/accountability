@@ -158,9 +158,19 @@ func save(f_name string, items []list.Item) {
 		i := listItem.(item)
 		line := ""
 		if i.marked {
-			line = "✅ " + i.title + ", " + i.command
+			if i.command{
+				line = "✅ " + i.title + ", " + i.command
+			}
+			else {
+				line = "✅ " + i.title 
+			}
 		} else {
-			line = i.title + ", " + i.command
+			if i.command{
+				line = i.title + ", " + i.command
+			}
+			else{
+				line = i.title
+			}
 		}
 		file.WriteString(line + "\n")
 	}
