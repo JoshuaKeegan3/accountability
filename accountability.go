@@ -55,10 +55,18 @@ func (d customDelegate) Render(w io.Writer, m list.Model, index int, listItem li
 }
 
 type model struct {
-	yesterday list.Model
-	todos     list.Model
-	focused   int
-	configDir string
+	// yesterday list.Model
+	// todos     list.Model
+	// weekly    list.Model
+	yesterday         list.Model
+	todos             list.Model
+	weekly            list.Model
+	focused           int
+	configDir         string
+	hideCompleted     bool
+	allItemsYesterday []list.Item
+	allItemsToday     []list.Item
+	ShowHelp          bool
 }
 
 func (m model) Init() tea.Cmd {
@@ -73,13 +81,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c", "q":
 			return m, tea.Quit
 		case "tab":
-			m.focused = (m.focused + 1) % 2
+			m.focused = (m.focused + 1) % 3
 			return m, nil
 		case "h", "left":
-			m.focused = 0
+			m.focused = (m.focused - 1 + 3) % 3
 			return m, nil
 		case "l", "right":
-			m.focused = 1
+			m.focused = (m.focused + 1) % 3
 			return m, nil
 		case "o":
 			var i item
@@ -97,6 +105,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				cmd.Start()
 			}
 			return m, nil
+		case "?":
+			m.ShowHelp = !m.ShowHelp
+			return m, nil
+		case "H":
+			m.hideCompleted = !m.hideCompleted
+			m.yesterday.SetItems(filterCompleted(m.hideCompleted, m.allItemsYesterday))
+			m.todos.SetItems(filterCompleted(m.hideCompleted, m.allItemsToday))
+			return m, nil
 		case " ":
 			var i item
 			var ok bool
@@ -107,39 +123,72 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				i.marked = !i.marked
 				m.yesterday.SetItem(m.yesterday.Index(), i)
-			} else {
+				for j, oldItem := range m.allItemsYesterday {
+					if oldItem.(item).title == i.title {
+						m.allItemsYesterday[j] = i
+						break
+					}
+				}
+			} else if m.focused == 1 {
 				i, ok = m.todos.SelectedItem().(item)
 				if !ok {
 					return m, nil
 				}
 				i.marked = !i.marked
 				m.todos.SetItem(m.todos.Index(), i)
+				for j, oldItem := range m.allItemsToday {
+					if oldItem.(item).title == i.title {
+						m.allItemsToday[j] = i
+						break
+					}
+				}
+			} else {
+				i, ok = m.weekly.SelectedItem().(item)
+				if !ok {
+					return m, nil
+				}
+				i.marked = !i.marked
+				m.weekly.SetItem(m.weekly.Index(), i)
 			}
 			return m, nil
 		}
 	case tea.WindowSizeMsg:
 		h, v := docStyle.GetFrameSize()
-		m.yesterday.SetSize(msg.Width/2-h, msg.Height-v)
-		m.todos.SetSize(msg.Width/2-h, msg.Height-v)
+		m.yesterday.SetSize(msg.Width/3-h, msg.Height-v)
+		m.todos.SetSize(msg.Width/3-h, msg.Height-v)
+		m.weekly.SetSize(msg.Width/3-h, msg.Height-v)
 	}
 
-	if m.focused == 0 {
+	switch m.focused {
+	case 0:
 		m.yesterday, cmd = m.yesterday.Update(msg)
-	} else {
+	case 1:
 		m.todos, cmd = m.todos.Update(msg)
+	default:
+		m.weekly, cmd = m.weekly.Update(msg)
 	}
 	return m, cmd
 }
 
 func (m model) View() string {
-	if m.focused == 0 {
+	if m.ShowHelp {
+		return "q: quit\no: open\nspace: mark as done\nH: hide completed\n?: show/hide this help"
+	}
+	switch m.focused {
+	case 0:
 		m.yesterday.SetDelegate(delegate_focused)
 		m.todos.SetDelegate(delegate_normal)
-	} else {
+		m.weekly.SetDelegate(delegate_normal)
+	case 1:
 		m.yesterday.SetDelegate(delegate_normal)
 		m.todos.SetDelegate(delegate_focused)
+		m.weekly.SetDelegate(delegate_normal)
+	default:
+		m.yesterday.SetDelegate(delegate_normal)
+		m.todos.SetDelegate(delegate_normal)
+		m.weekly.SetDelegate(delegate_focused)
 	}
-	return lipgloss.JoinHorizontal(lipgloss.Top, docStyle.Render(m.yesterday.View()), docStyle.Render(m.todos.View()))
+	return lipgloss.JoinHorizontal(lipgloss.Top, docStyle.Render(m.yesterday.View()), docStyle.Render(m.todos.View()), docStyle.Render(m.weekly.View()))
 }
 
 func save(f_name string, items []list.Item) {
@@ -276,6 +325,18 @@ func getConfigDir() (string, error) {
 	}
 	return appConfigDir, nil
 }
+func filterCompleted(hide bool, allItems []list.Item) []list.Item {
+	if !hide {
+		return allItems
+	}
+	var filteredItems []list.Item
+	for _, listItem := range allItems {
+		if !listItem.(item).marked {
+			filteredItems = append(filteredItems, listItem)
+		}
+	}
+	return filteredItems
+}
 
 func main() {
 	configDir, err := getConfigDir()
@@ -294,18 +355,28 @@ func main() {
 
 	yesterday_items := load(filepath.Join(configDir, "yesterday.txt"), configDir)
 	todos_items := load(filepath.Join(configDir, "todos.txt"), configDir)
+	weekly_items := load(filepath.Join(configDir, "weekly.txt"), configDir)
 	m := model{
-		yesterday: list.New(yesterday_items, delegate_focused, 0, 0),
-		todos:     list.New(todos_items, delegate_normal, 0, 0),
-		focused:   0,
-		configDir: configDir,
+		yesterday:         list.New(yesterday_items, delegate_focused, 0, 0),
+		todos:             list.New(todos_items, delegate_normal, 0, 0),
+		weekly:            list.New(weekly_items, delegate_normal, 0, 0),
+		focused:           0,
+		configDir:         configDir,
+		hideCompleted:     false,
+		allItemsYesterday: yesterday_items,
+		allItemsToday:     todos_items,
+		ShowHelp:          false,
 	}
 	m.yesterday.Title = "Things (Hopefully) done yesterday"
 	m.todos.Title = "Todays TODOS"
+	m.weekly.Title = "Weekly Todos"
 	m.yesterday.SetShowFilter(false)
 	m.yesterday.SetFilteringEnabled(false)
 	m.todos.SetShowFilter(false)
 	m.todos.SetFilteringEnabled(false)
+	m.weekly.SetShowFilter(false)
+	m.weekly.SetFilteringEnabled(false)
+
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	finalModel, err := p.Run()
 	if err != nil {
@@ -321,4 +392,5 @@ func main() {
 
 	save(filepath.Join(m.configDir, "yesterday.txt"), m.yesterday.Items())
 	save(filepath.Join(m.configDir, "todos.txt"), m.todos.Items())
+	save(filepath.Join(m.configDir, "weekly.txt"), m.weekly.Items())
 }
