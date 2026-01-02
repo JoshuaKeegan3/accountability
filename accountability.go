@@ -56,9 +56,6 @@ func (d customDelegate) Render(w io.Writer, m list.Model, index int, listItem li
 }
 
 type model struct {
-	// yesterday list.Model
-	// todos     list.Model
-	// weekly    list.Model
 	yesterday         list.Model
 	todos             list.Model
 	weekly            list.Model
