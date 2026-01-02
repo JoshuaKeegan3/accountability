@@ -94,7 +94,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			if i.command != "" {
 				cmd := exec.Command("sh", "-c", i.command)
-				cmd.Run()
+				cmd.Start()
 			}
 			return m, nil
 		case " ":
