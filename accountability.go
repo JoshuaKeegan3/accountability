@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -57,6 +58,7 @@ type model struct {
 	yesterday list.Model
 	todos     list.Model
 	focused   int
+	configDir string
 }
 
 func (m model) Init() tea.Cmd {
@@ -158,19 +160,13 @@ func save(f_name string, items []list.Item) {
 		i := listItem.(item)
 		line := ""
 		if i.marked {
-			if i.command{
-				line = "✅ " + i.title + ", " + i.command
-			}
-			else {
-				line = "✅ " + i.title 
-			}
+			line = "✅ "
+		}
+
+		if i.command != "" {
+			line = line + i.title + ", " + i.command
 		} else {
-			if i.command{
-				line = i.title + ", " + i.command
-			}
-			else{
-				line = i.title
-			}
+			line = line + i.title
 		}
 		file.WriteString(line + "\n")
 	}
@@ -181,7 +177,7 @@ func save(f_name string, items []list.Item) {
 		os.Exit(1)
 	}
 }
-func load(f_name string) []list.Item {
+func load(f_name string, configDir string) []list.Item {
 	file, err := os.Open(f_name)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -236,17 +232,22 @@ func load(f_name string) []list.Item {
 		marked := false
 		if strings.HasPrefix(title, "✅ ") {
 			if different_day {
-				log_file, err := os.OpenFile("unticked.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+				log_file, err := os.OpenFile(filepath.Join(configDir, "unticked.log"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 				if err != nil {
 					fmt.Println("Error opening log file:", err)
 				} else {
-					log_line := fmt.Sprintf("%d-%d-%d: %s\n", year, month, day, strings.TrimPrefix(title, "✅ "))
+					log_t := t
+					if f_name == "yesterday.txt" {
+						log_t = t.AddDate(0, 0, -1)
+					}
+					log_year, log_month, log_day := log_t.Date()
+					log_line := fmt.Sprintf("%d-%d-%d: %s\n", log_year, log_month, log_day, strings.TrimPrefix(title, "✅ "))
 					log_file.WriteString(log_line)
 					log_file.Close()
 				}
 			}
 			marked = !different_day
-			line = strings.TrimPrefix(line, "✅ ")
+			title = strings.TrimPrefix(title, "✅ ")
 		}
 
 		l = append(l, item{
@@ -262,7 +263,27 @@ func load(f_name string) []list.Item {
 var delegate_normal = customDelegate{list.NewDefaultDelegate()}
 var delegate_focused = customDelegate{list.NewDefaultDelegate()}
 
+func getConfigDir() (string, error) {
+	configDir, err := os.UserConfigDir()
+	if err != nil {
+		return "", err
+	}
+	appConfigDir := filepath.Join(configDir, "accountability")
+	if _, err := os.Stat(appConfigDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(appConfigDir, 0755); err != nil {
+			return "", err
+		}
+	}
+	return appConfigDir, nil
+}
+
 func main() {
+	configDir, err := getConfigDir()
+	if err != nil {
+		fmt.Println("Error getting config directory:", err)
+		os.Exit(1)
+	}
+
 	delegate_focused.Styles.SelectedTitle = lipgloss.NewStyle().
 		Border(lipgloss.NormalBorder(), false, false, false, true).
 		BorderForeground(lipgloss.Color("228")).
@@ -271,12 +292,13 @@ func main() {
 	delegate_focused.ShowDescription = false
 	delegate_normal.ShowDescription = false
 
-	yesterday_items := load("yesterday.txt")
-	todos_items := load("todos.txt")
+	yesterday_items := load(filepath.Join(configDir, "yesterday.txt"), configDir)
+	todos_items := load(filepath.Join(configDir, "todos.txt"), configDir)
 	m := model{
 		yesterday: list.New(yesterday_items, delegate_focused, 0, 0),
 		todos:     list.New(todos_items, delegate_normal, 0, 0),
 		focused:   0,
+		configDir: configDir,
 	}
 	m.yesterday.Title = "Things (Hopefully) done yesterday"
 	m.todos.Title = "Todays TODOS"
@@ -291,6 +313,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	save("yesterday.txt", finalModel.(model).yesterday.Items())
-	save("todos.txt", finalModel.(model).todos.Items())
+	m, ok := finalModel.(model)
+	if !ok {
+		fmt.Println("Error getting final model")
+		os.Exit(1)
+	}
+
+	save(filepath.Join(m.configDir, "yesterday.txt"), m.yesterday.Items())
+	save(filepath.Join(m.configDir, "todos.txt"), m.todos.Items())
 }
