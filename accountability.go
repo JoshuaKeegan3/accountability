@@ -406,7 +406,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	save(filepath.Join(m.configDir, "yesterday.txt"), m.yesterday.Items())
-	save(filepath.Join(m.configDir, "todos.txt"), m.todos.Items())
+	save(filepath.Join(m.configDir, "yesterday.txt"), m.allItemsYesterday)
+	save(filepath.Join(m.configDir, "todos.txt"), m.allItemsToday)
 	save(filepath.Join(m.configDir, "weekly.txt"), m.weekly.Items())
 }
