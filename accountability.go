@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -66,7 +67,6 @@ type model struct {
 	hideCompleted     bool
 	allItemsYesterday []list.Item
 	allItemsToday     []list.Item
-	ShowHelp          bool
 }
 
 func (m model) Init() tea.Cmd {
@@ -104,9 +104,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				cmd := exec.Command("sh", "-c", i.command)
 				cmd.Start()
 			}
-			return m, nil
-		case "?":
-			m.ShowHelp = !m.ShowHelp
 			return m, nil
 		case "H":
 			m.hideCompleted = !m.hideCompleted
@@ -171,22 +168,27 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	if m.ShowHelp {
-		return "q: quit\no: open\nspace: mark as done\nH: hide completed\n?: show/hide this help"
-	}
-	switch m.focused {
-	case 0:
+	if m.focused == 0 {
 		m.yesterday.SetDelegate(delegate_focused)
 		m.todos.SetDelegate(delegate_normal)
 		m.weekly.SetDelegate(delegate_normal)
-	case 1:
+		m.yesterday.SetShowHelp(true)
+		m.todos.SetShowHelp(false)
+		m.weekly.SetShowHelp(false)
+	} else if m.focused == 1 {
 		m.yesterday.SetDelegate(delegate_normal)
 		m.todos.SetDelegate(delegate_focused)
 		m.weekly.SetDelegate(delegate_normal)
-	default:
+		m.yesterday.SetShowHelp(false)
+		m.todos.SetShowHelp(true)
+		m.weekly.SetShowHelp(false)
+	} else {
 		m.yesterday.SetDelegate(delegate_normal)
 		m.todos.SetDelegate(delegate_normal)
 		m.weekly.SetDelegate(delegate_focused)
+		m.yesterday.SetShowHelp(false)
+		m.todos.SetShowHelp(false)
+		m.weekly.SetShowHelp(true)
 	}
 	return lipgloss.JoinHorizontal(lipgloss.Top, docStyle.Render(m.yesterday.View()), docStyle.Render(m.todos.View()), docStyle.Render(m.weekly.View()))
 }
@@ -365,11 +367,28 @@ func main() {
 		hideCompleted:     false,
 		allItemsYesterday: yesterday_items,
 		allItemsToday:     todos_items,
-		ShowHelp:          false,
 	}
 	m.yesterday.Title = "Things (Hopefully) done yesterday"
 	m.todos.Title = "Todays TODOS"
 	m.weekly.Title = "Weekly Todos"
+	m.yesterday.AdditionalShortHelpKeys = func() []key.Binding {
+		return []key.Binding{
+			key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "open")),
+			key.NewBinding(key.WithKeys("H"), key.WithHelp("H", "hide")),
+		}
+	}
+	m.todos.AdditionalShortHelpKeys = func() []key.Binding {
+		return []key.Binding{
+			key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "open")),
+			key.NewBinding(key.WithKeys("H"), key.WithHelp("H", "hide")),
+		}
+	}
+	m.weekly.AdditionalShortHelpKeys = func() []key.Binding {
+		return []key.Binding{
+			key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "open")),
+			key.NewBinding(key.WithKeys("H"), key.WithHelp("H", "hide")),
+		}
+	}
 	m.yesterday.SetShowFilter(false)
 	m.yesterday.SetFilteringEnabled(false)
 	m.todos.SetShowFilter(false)
