@@ -58,7 +58,6 @@ func (d customDelegate) Render(w io.Writer, m list.Model, index int, listItem li
 type model struct {
 	yesterday         list.Model
 	todos             list.Model
-	weekly            list.Model
 	focused           int
 	configDir         string
 	hideCompleted     bool
@@ -78,13 +77,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c", "q":
 			return m, tea.Quit
 		case "tab":
-			m.focused = (m.focused + 1) % 3
+			m.focused = (m.focused + 1) % 2
 			return m, nil
 		case "h", "left":
-			m.focused = (m.focused - 1 + 3) % 3
+			m.focused = (m.focused - 1 + 2) % 2
 			return m, nil
 		case "l", "right":
-			m.focused = (m.focused + 1) % 3
+			m.focused = (m.focused + 1) % 2
 			return m, nil
 		case "o":
 			var i item
@@ -136,21 +135,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						break
 					}
 				}
-			} else {
-				i, ok = m.weekly.SelectedItem().(item)
-				if !ok {
-					return m, nil
-				}
-				i.marked = !i.marked
-				m.weekly.SetItem(m.weekly.Index(), i)
 			}
 			return m, nil
 		}
 	case tea.WindowSizeMsg:
 		h, v := docStyle.GetFrameSize()
-		m.yesterday.SetSize(msg.Width/3-h, msg.Height-v)
-		m.todos.SetSize(msg.Width/3-h, msg.Height-v)
-		m.weekly.SetSize(msg.Width/3-h, msg.Height-v)
+		m.yesterday.SetSize(msg.Width/2-h, msg.Height-v)
+		m.todos.SetSize(msg.Width/2-h, msg.Height-v)
 	}
 
 	switch m.focused {
@@ -158,8 +149,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.yesterday, cmd = m.yesterday.Update(msg)
 	case 1:
 		m.todos, cmd = m.todos.Update(msg)
-	default:
-		m.weekly, cmd = m.weekly.Update(msg)
 	}
 	return m, cmd
 }
@@ -168,26 +157,15 @@ func (m model) View() string {
 	if m.focused == 0 {
 		m.yesterday.SetDelegate(delegate_focused)
 		m.todos.SetDelegate(delegate_normal)
-		m.weekly.SetDelegate(delegate_normal)
 		m.yesterday.SetShowHelp(true)
 		m.todos.SetShowHelp(false)
-		m.weekly.SetShowHelp(false)
 	} else if m.focused == 1 {
 		m.yesterday.SetDelegate(delegate_normal)
 		m.todos.SetDelegate(delegate_focused)
-		m.weekly.SetDelegate(delegate_normal)
 		m.yesterday.SetShowHelp(false)
 		m.todos.SetShowHelp(true)
-		m.weekly.SetShowHelp(false)
-	} else {
-		m.yesterday.SetDelegate(delegate_normal)
-		m.todos.SetDelegate(delegate_normal)
-		m.weekly.SetDelegate(delegate_focused)
-		m.yesterday.SetShowHelp(false)
-		m.todos.SetShowHelp(false)
-		m.weekly.SetShowHelp(true)
 	}
-	return lipgloss.JoinHorizontal(lipgloss.Top, docStyle.Render(m.yesterday.View()), docStyle.Render(m.todos.View()), docStyle.Render(m.weekly.View()))
+	return lipgloss.JoinHorizontal(lipgloss.Top, docStyle.Render(m.yesterday.View()), docStyle.Render(m.todos.View()))
 }
 
 func save(f_name string, items []list.Item) {
@@ -354,11 +332,9 @@ func main() {
 
 	yesterday_items := load(filepath.Join(configDir, "yesterday.txt"), configDir)
 	todos_items := load(filepath.Join(configDir, "todos.txt"), configDir)
-	weekly_items := load(filepath.Join(configDir, "weekly.txt"), configDir)
 	m := model{
 		yesterday:         list.New(yesterday_items, delegate_focused, 0, 0),
 		todos:             list.New(todos_items, delegate_normal, 0, 0),
-		weekly:            list.New(weekly_items, delegate_normal, 0, 0),
 		focused:           0,
 		configDir:         configDir,
 		hideCompleted:     false,
@@ -367,7 +343,6 @@ func main() {
 	}
 	m.yesterday.Title = "Things (Hopefully) done yesterday"
 	m.todos.Title = "Todays TODOS"
-	m.weekly.Title = "Weekly Todos"
 	m.yesterday.AdditionalShortHelpKeys = func() []key.Binding {
 		return []key.Binding{
 			key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "open")),
@@ -380,18 +355,10 @@ func main() {
 			key.NewBinding(key.WithKeys("H"), key.WithHelp("H", "hide")),
 		}
 	}
-	m.weekly.AdditionalShortHelpKeys = func() []key.Binding {
-		return []key.Binding{
-			key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "open")),
-			key.NewBinding(key.WithKeys("H"), key.WithHelp("H", "hide")),
-		}
-	}
 	m.yesterday.SetShowFilter(false)
 	m.yesterday.SetFilteringEnabled(false)
 	m.todos.SetShowFilter(false)
 	m.todos.SetFilteringEnabled(false)
-	m.weekly.SetShowFilter(false)
-	m.weekly.SetFilteringEnabled(false)
 
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	finalModel, err := p.Run()
@@ -408,5 +375,4 @@ func main() {
 
 	save(filepath.Join(m.configDir, "yesterday.txt"), m.allItemsYesterday)
 	save(filepath.Join(m.configDir, "todos.txt"), m.allItemsToday)
-	save(filepath.Join(m.configDir, "weekly.txt"), m.weekly.Items())
 }
