@@ -75,6 +75,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c", "q":
+			if os.Getenv("ZELLIJ") != "" {
+				cmd := exec.Command("zellij", "action", "close-pane")
+				cmd.Start()
+				return m, nil
+			}
 			return m, tea.Quit
 		case "tab":
 			m.focused = (m.focused + 1) % 2
@@ -122,6 +127,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						break
 					}
 				}
+				save(filepath.Join(m.configDir, "yesterday.txt"), m.allItemsYesterday)
 			} else if m.focused == 1 {
 				i, ok = m.todos.SelectedItem().(item)
 				if !ok {
@@ -135,7 +141,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						break
 					}
 				}
+				save(filepath.Join(m.configDir, "todos.txt"), m.allItemsToday)
 			}
+
 			return m, nil
 		}
 	case tea.WindowSizeMsg:
@@ -373,6 +381,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	save(filepath.Join(m.configDir, "yesterday.txt"), m.allItemsYesterday)
-	save(filepath.Join(m.configDir, "todos.txt"), m.allItemsToday)
+	// save(filepath.Join(m.configDir, "yesterday.txt"), m.allItemsYesterday)
+	// save(filepath.Join(m.configDir, "todos.txt"), m.allItemsToday)
 }
