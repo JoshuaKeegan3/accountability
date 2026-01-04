@@ -161,12 +161,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	if m.focused == 0 {
+	switch m.focused {
+	case 0:
 		m.yesterday.SetDelegate(delegate_focused)
 		m.todos.SetDelegate(delegate_normal)
 		m.yesterday.SetShowHelp(true)
 		m.todos.SetShowHelp(false)
-	} else if m.focused == 1 {
+	case 1:
 		m.yesterday.SetDelegate(delegate_normal)
 		m.todos.SetDelegate(delegate_focused)
 		m.yesterday.SetShowHelp(false)
