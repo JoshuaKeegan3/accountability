@@ -33,6 +33,15 @@ func (i item) Description() string { return "" }
 type customDelegate struct {
 	list.DefaultDelegate
 }
+type model struct {
+	yesterday         list.Model
+	todos             list.Model
+	focused           int
+	configDir         string
+	hideCompleted     bool
+	allItemsYesterday []list.Item
+	allItemsToday     []list.Item
+}
 
 func (d customDelegate) Render(w io.Writer, m list.Model, index int, listItem list.Item) {
 	i, ok := listItem.(item)
@@ -53,16 +62,6 @@ func (d customDelegate) Render(w io.Writer, m list.Model, index int, listItem li
 	}
 
 	fmt.Fprint(w, fn(str))
-}
-
-type model struct {
-	yesterday         list.Model
-	todos             list.Model
-	focused           int
-	configDir         string
-	hideCompleted     bool
-	allItemsYesterday []list.Item
-	allItemsToday     []list.Item
 }
 
 func (m model) Init() tea.Cmd {
