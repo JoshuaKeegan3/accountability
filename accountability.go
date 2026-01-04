@@ -76,7 +76,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "ctrl+c", "q":
 			if os.Getenv("ZELLIJ") != "" {
-				cmd := exec.Command("zellij", "action", "close-pane")
+				cmd := exec.Command("pkill", "-9", "zellij")
 				cmd.Start()
 				return m, nil
 			}
