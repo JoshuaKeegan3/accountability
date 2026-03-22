@@ -4,7 +4,8 @@ set LAYOUT_FILE (mktemp)
 
 set layout_content "layout {
     pane split_direction=\"vertical\" {
-        pane {
+
+        pane size=\"33%\" {
             command \"accountability\"
         }
         pane {
